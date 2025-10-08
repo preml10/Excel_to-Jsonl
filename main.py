@@ -3,7 +3,7 @@ import pandas as pd
 import json
 from io import StringIO, BytesIO
 
-st.title("📄 Excel/CSV → JSONL Converter")
+st.title("📘 Excel/CSV → JSONL Converter")
 
 uploaded_file = st.file_uploader("Upload your Excel or CSV file", type=["xlsx", "xls", "csv"])
 
@@ -31,6 +31,12 @@ if uploaded_file:
             df.apply(lambda row: json.dumps(row.to_dict(), ensure_ascii=False), axis=1)
         )
 
+        st.success("✅ Successfully converted!")
+
+        # Preview
+        st.subheader("🔍 Preview of Converted JSONL")
+        st.code("\n".join(jsonl_str.splitlines()[:5]))
+
         # Create downloadable file
         jsonl_bytes = StringIO(jsonl_str).getvalue().encode("utf-8")
         st.download_button(
@@ -40,11 +46,7 @@ if uploaded_file:
             mime="application/json"
         )
 
-        st.success("✅ Successfully converted!")
-
-        # Preview
-        with st.expander("🔍 Preview JSONL"):
-            st.text(jsonl_str[:1000] + ("\n... (truncated)" if len(jsonl_str) > 1000 else ""))
+        
 
     except Exception as e:
         st.error(f"❌ Conversion failed: {str(e)}")
