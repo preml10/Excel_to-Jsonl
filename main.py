@@ -1,54 +1,53 @@
+import streamlit as st
 import pandas as pd
 import json
-import streamlit as st
-from datetime import datetime
+from io import StringIO, BytesIO
 
-st.set_page_config(page_title="Excel to JSONL Converter", page_icon="📘")
+st.title("📄 Excel/CSV → JSONL Converter")
 
-st.title("📘 Excel to JSONL Converter")
+uploaded_file = st.file_uploader("Upload your Excel or CSV file", type=["xlsx", "xls", "csv"])
 
-
-uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx", "xls"])
-
-def safe_convert(value):
-   
-    if pd.isna(value):
-        return None
-    if isinstance(value, (pd.Timestamp, datetime)):
-        return value.isoformat()
-    if isinstance(value, (list, dict, str, int, float, bool, type(None))):
-        return value
-    return str(value)
-
-if uploaded_file is not None:
+if uploaded_file:
     try:
-        
-        df = pd.read_excel(uploaded_file)
-
-        if df.empty:
-            st.error("❌ The Excel file is empty. Please upload a valid file.")
+        # Detect file type
+        if uploaded_file.name.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(uploaded_file)
+        elif uploaded_file.name.endswith('.csv'):
+            df = pd.read_csv(uploaded_file)
         else:
-            st.success(f"✅ File loaded successfully with {len(df)} rows and {len(df.columns)} columns.")
+            st.error("❌ Unsupported file type! Please upload .xlsx, .xls, or .csv.")
+            st.stop()
 
-           
-            df = df.applymap(safe_convert)
+        # Handle empty file
+        if df.empty:
+            st.warning("⚠️ The file is empty. Please upload a file with data.")
+            st.stop()
 
-           
-            jsonl_data = "\n".join(df.apply(lambda row: json.dumps(row.to_dict(), ensure_ascii=False), axis=1))
+        # Convert Timestamps and other non-serializable objects
+        df = df.applymap(lambda x: x.isoformat() if hasattr(x, "isoformat") else x)
 
-         
-            st.subheader("🔍 Preview of Converted JSONL")
-            st.code("\n".join(jsonl_data.splitlines()[:5]))
+        # Convert to JSONL
+        jsonl_str = "\n".join(
+            df.apply(lambda row: json.dumps(row.to_dict(), ensure_ascii=False), axis=1)
+        )
 
-          
-            st.download_button(
-                label="⬇️ Download JSONL File",
-                data=jsonl_data.encode("utf-8"),
-                file_name="converted.jsonl",
-                mime="application/json"
-            )
+        # Create downloadable file
+        jsonl_bytes = StringIO(jsonl_str).getvalue().encode("utf-8")
+        st.download_button(
+            label="⬇️ Download JSONL File",
+            data=jsonl_bytes,
+            file_name=uploaded_file.name.rsplit(".", 1)[0] + ".jsonl",
+            mime="application/json"
+        )
+
+        st.success("✅ Successfully converted!")
+
+        # Preview
+        with st.expander("🔍 Preview JSONL"):
+            st.text(jsonl_str[:1000] + ("\n... (truncated)" if len(jsonl_str) > 1000 else ""))
 
     except Exception as e:
-        st.error(f"⚠️ Error during conversion: {e}")
+        st.error(f"❌ Conversion failed: {str(e)}")
+
 else:
-    st.info("👆 Please upload an Excel file to begin.")
+    st.info("📤 Please upload an Excel or CSV file to start.")
